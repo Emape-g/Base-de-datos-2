@@ -41,7 +41,7 @@ yargs(hideBin(process.argv))
 
   
   .command(
-    "calcular",
+    "operacion",
     "Realiza una operación matemática",
     {
       operacion: {
