@@ -4,12 +4,12 @@ const { hideBin } = require("yargs/helpers");
 const argumentos = yargs(hideBin(process.argv))
   .option("nombre", {
     type: "string",
-    demandOption: true, // obliga a poner --nombre
+    demandOption: true, 
     describe: "Tu nombre",
   })
   .option("edad", {
     type: "number",
-    demandOption: true, // obliga a poner --edad
+    demandOption: true, 
     describe: "Tu edad",
   })
   .check((argv) => {
