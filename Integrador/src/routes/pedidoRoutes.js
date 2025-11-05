@@ -35,6 +35,105 @@ pedidoRoutes.get("/:id", async (req, res) => {
   }
 });
 
+/*
+  📘 GET /api/ordenes
+  Lista pedidos junto con los datos de usuario.
+  Uso de agregación para cumplir con requerimientos del TP.
+*/
+pedidoRoutes.get("/ordenes", async (req, res) => {
+  try {
+    const ordenes = await Pedido.aggregate([
+      {
+        $lookup: {
+          from: "usuarios",
+          localField: "usuario",
+          foreignField: "_id",
+          as: "usuarioInfo"
+        }
+      },
+      { $unwind: "$usuarioInfo" },
+      {
+        $project: {
+          _id: 1,
+          fecha: 1,
+          estado: 1,
+          total: 1,
+          forma_pago: 1,
+          "usuarioInfo.nombre": 1,
+          "usuarioInfo.email": 1,
+          "usuarioInfo.direccion": 1
+        }
+      },
+      { $sort: { fecha: -1 } }
+    ]);
+
+    if (ordenes.length === 0) return res.status(204).json([]);
+    res.status(200).json(ordenes);
+  } catch (error) {
+    res.status(500).json({ message: `Error en la petición: ${error.message}` });
+  }
+});
+
+pedidoRoutes.get("/pedidos/stats", async (req, res) => {
+  try {
+    const estadisticas = await Pedido.aggregate([
+      {
+        $group: {
+          _id: "$estado", // Agrupar por campo "estado"
+          totalPedidos: { $sum: 1 } // Contar cantidad
+        }
+      },
+      { $sort: { totalPedidos: -1 } } // Ordenar descendente
+    ]);
+
+    if (estadisticas.length === 0) return res.status(204).json([]);
+
+    res.status(200).json(estadisticas);
+  } catch (error) {
+    res.status(500).json({ message: `Error en la petición: ${error.message}` });
+  }
+});
+pedidoRoutes.get("/ordenes/user/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "ID de usuario inválido" });
+    }
+
+    const pedidosUsuario = await Pedido.aggregate([
+      { $match: { usuario: new mongoose.Types.ObjectId(userId) } }, // $eq implícito
+      {
+        $lookup: {
+          from: "usuarios",
+          localField: "usuario",
+          foreignField: "_id",
+          as: "usuarioInfo"
+        }
+      },
+      { $unwind: "$usuarioInfo" },
+      {
+        $project: {
+          _id: 1,
+          fecha: 1,
+          estado: 1,
+          total: 1,
+          forma_pago: 1,
+          "usuarioInfo.nombre": 1,
+          "usuarioInfo.email": 1
+        }
+      },
+      { $sort: { fecha: -1 } }
+    ]);
+
+    if (!pedidosUsuario.length) return res.status(204).json([]);
+
+    res.status(200).json(pedidosUsuario);
+  } catch (error) {
+    res.status(500).json({ message: `Error en la petición: ${error.message}` });
+  }
+});
+
 pedidoRoutes.post("/", async (req, res) => {
   try {
     const { estado, total, forma_pago, items = [], usuario } = req.body;
@@ -90,6 +189,30 @@ pedidoRoutes.patch("/:id", async (req, res) => {
       message: "Pedido actualizado correctamente",
       pedido: pedidoActualizado
     });
+  } catch (error) {
+    res.status(500).json({ message: `Error en la petición: ${error.message}` });
+  }
+});
+
+pedidoRoutes.patch("/ordenes/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { estado } = req.body;
+
+    if (!estado) {
+      return res.status(400).json({ message: "Debe especificar un nuevo estado" });
+    }
+
+    const pedidoActualizado = await Pedido.updateOne(
+      { _id: id },
+      { $set: { estado } } // operador de modificación explícito
+    );
+
+    if (pedidoActualizado.matchedCount === 0) {
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
+
+    res.status(200).json({ message: "Estado del pedido actualizado correctamente" });
   } catch (error) {
     res.status(500).json({ message: `Error en la petición: ${error.message}` });
   }

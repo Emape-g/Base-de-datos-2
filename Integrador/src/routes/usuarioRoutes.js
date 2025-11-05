@@ -2,9 +2,10 @@ import express from "express"
 import { Usuario } from "../modules/usuarios.js"
 import { Pedido} from "../modules/pedidos.js"
 import { Reseña } from "../modules/reseñas.js"
-
+import { Carrito } from "../modules/carritos.js"
 
 export const usuarioRoutes = express.Router()
+
 usuarioRoutes.get("/", async (req, res) =>{
     try {
         const usuarios = await Usuario.find()
@@ -61,7 +62,7 @@ usuarioRoutes.patch("/:id", async (req, res) => {
     const { id } = req.params;
     const data = {};
 
-    const permitidos = ["nombre", "email", "direccion", "telefono"];
+    const permitidos = ["nombre", "email", "direccion", "telefono","edad"];
     for (const campo of permitidos) {
       if (req.body[campo] !== undefined) {
         data[campo] = req.body[campo];
@@ -93,6 +94,7 @@ usuarioRoutes.delete("/:id", async (req, res) => {
 
     await Pedido.deleteMany({ usuario: id });
     await Reseña.deleteMany({ usuario: id });
+    await Carrito.deleteMany({ usuario: id }); 
 
     const usrDelete = await Usuario.findByIdAndDelete(id);
     if (!usrDelete) {
@@ -100,7 +102,7 @@ usuarioRoutes.delete("/:id", async (req, res) => {
     }
     
     res.status(200).json({
-      message: "Usuario eliminado junto con sus pedidos y reseñas"
+      message: "Usuario eliminado junto con sus pedidos , reseñas y carrito"
     });
 
   } catch (error) {

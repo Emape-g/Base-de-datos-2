@@ -5,6 +5,7 @@ import { Producto } from "../modules/productos.js"
 
 export const carritoRoutes = express.Router()
 
+// GET todos los carritos
 carritoRoutes.get("/", async (req, res) =>{
     try {
         const carritos = await Carrito.find()
@@ -38,7 +39,65 @@ carritoRoutes.get("/:id", async (req, res) => {
   }
 });
 
-// POST crear reseña
+//GET USUARIOID
+carritoRoutes.get("/usuario/:usuarioid", async (req, res) => {
+  try {
+    const carrito = await Carrito.findById(req.params.id)
+        .populate("usuario", "nombre")
+        .populate("items.producto", "nombre")
+
+    if (!carrito) {
+      return res.status(404).json({ message: "Carrito no encontrada" });
+    }
+
+    res.status(200).json(carrito);
+  } catch (error) {
+    res.status(500).json({ message: `Error en la petición: ${error.message}` });
+  }
+});
+
+carritoRoutes.get("/usuario/:usuarioId/total", async (req, res) => {
+  try {
+    const { usuarioId } = req.params;
+
+    const total = await Carrito.aggregate([
+      { $match: { usuario: new mongoose.Types.ObjectId(usuarioId) } }, //  $match
+      { $unwind: "$items" },                                           //  $unwind
+      {
+        $lookup: {
+          from: "productos",
+          localField: "items.producto",
+          foreignField: "_id",
+          as: "productoInfo"
+        }
+      },
+      { $unwind: "$productoInfo" },
+      {
+        $group: {
+          _id: "$_id",
+          total: { $sum: { $multiply: ["$items.cantidad", "$productoInfo.precio"] } }, //  $sum y $multiply
+          detalles: {
+            $push: {
+              producto: "$productoInfo.nombre",
+              cantidad: "$items.cantidad",
+              subtotal: { $multiply: ["$items.cantidad", "$productoInfo.precio"] }
+            }
+          }
+        }
+      }
+    ]);
+
+    if (total.length === 0)
+      return res.status(404).json({ message: "Carrito no encontrado" });
+
+    res.status(200).json(total[0]);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+// POST crear carrito
 carritoRoutes.post("/", async (req, res) => {
   try {
     const { usuario, items } = req.body;
@@ -120,6 +179,22 @@ carritoRoutes.patch("/:id", async (req, res) => {
     } else {
       return res.status(400).json({ message: "Acción inválida (use agregar, actualizar o eliminar)" });
     }
+    /*await Carrito.updateOne(
+  { _id: id },
+  { $pull: { items: { producto: productoId } } } // 🔹 operador $pull
+);
+
+// ejemplo: agregar producto con $push
+await Carrito.updateOne(
+  { _id: id },
+  { $push: { items: { producto: productoId, cantidad: 1 } } } // 🔹 operador $push
+);
+
+// ejemplo: actualizar cantidad con $set
+await Carrito.updateOne(
+  { _id: id, "items.producto": productoId },
+  { $set: { "items.$.cantidad": nuevaCantidad } } // 🔹 operador $set
+); */
 
     // Guardar cambios
     await carrito.save();
